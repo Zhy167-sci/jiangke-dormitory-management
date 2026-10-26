@@ -1,0 +1,35 @@
+# 真实学生数据与业务输出：绝不提交
+out/
+delivered/
+data/local/
+data/*.xls
+data/*.xlsx
+!data/roster.example.xlsx
+*.local.json
+*.local.xlsx
+
+# 构建产物：整个目录都不提交，源文件与脱敏输入另行保留
+dist/
+web/_smoke.html
+web/out_sample.zip
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+
+# Node
+node_modules/
+
+# 系统与编辑器
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# 日志与临时文件
+*.log
+*.tmp
+~$*

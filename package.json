@@ -1,0 +1,20 @@
+{
+  "name": "jiangke-dorm-manager",
+  "version": "1.0.0",
+  "private": true,
+  "description": "江科大宿舍管理：离线查寝得分汇总工具",
+  "license": "MIT",
+  "scripts": {
+    "test": "node web/test_core.js",
+    "demo": "node web/gen_zip.js",
+    "build": "python scripts/build_web.py"
+  },
+  "devDependencies": {
+    "exceljs": "4.4.0",
+    "jszip": "3.10.1",
+    "xlsx": "0.18.5"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

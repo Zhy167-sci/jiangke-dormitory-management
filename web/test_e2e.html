@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>端到端测试：脱敏数据完整流程</title>
+<style>
+  body { font-family: "Microsoft YaHei", sans-serif; margin: 18px; color: #1f2937; background: #f8fafc; font-size: 13px; }
+  .card { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; max-width: 900px; }
+  .ok { color: #15803d; } .bad { color: #b91c1c; }
+  pre { background: #0f172a; color: #e2e8f0; padding: 10px; border-radius: 6px; font-size: 11px; overflow: auto; max-height: 260px; }
+  .sum { font-weight: 700; margin-top: 10px; font-size: 14px; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h2 style="font-size:15px;margin:0 0 10px">端到端测试：两周脱敏 XLSX → 全部汇总表</h2>
+  <div id="result">运行中…</div>
+  <pre id="log"></pre>
+</div>
+<script src="vendor.bundle.js"></script>
+<script src="xlsx.full.min.js"></script>
+<script src="roster.js"></script>
+<script src="core.js"></script>
+<script src="writer.js"></script>
+<script src="build.js"></script>
+<script>
+const logBuf = [];
+const log = s => { logBuf.push(s); document.getElementById('log').textContent = logBuf.join('\n'); };
+const checks = [];
+const check = (label, ok, detail) => checks.push([label, ok, detail]);
+
+async function loadDir(folder) {
+  const names = folder === 'w7'
+    ? ['C1_20261012.xlsx', 'C1_20261012 (1).xlsx', 'C2_20261012.xlsx']
+    : ['C1_20261019.xlsx', 'C2_20261019.xlsx'];
+  const files = [];
+  for (const name of names) {
+    const response = await fetch('./testdata/' + folder + '/' + encodeURIComponent(name));
+    if (!response.ok) throw new Error('找不到测试文件：' + name);
+    files.push({ name, buffer: await response.arrayBuffer() });
+  }
+  return files;
+}
+
+async function run() {
+  const t0 = performance.now();
+  const f7 = await loadDir('w7');
+  const f8 = await loadDir('w8');
+  check('读入文件数', f7.length + f8.length === 5, `${f7.length} + ${f8.length}`);
+
+  log('开始构建 …');
+  const res = await window.BUILD.buildAll(
+    [{ week: '第7周', files: f7 }, { week: '第8周', files: f8 }],
+    (step, text) => log(`[${step}] ${text}`)
+  );
+  const ms = Math.round(performance.now() - t0);
+
+  // 2 班 × 2 周 + 2 楼 × 2 周 + 2 全表 + 1 总表 = 11。
+  check('两周表数量 11', res.count === 11, String(res.count));
+  const zipFiles = Object.keys(res.zip.files).filter(k => !res.zip.files[k].dir && /\.xlsx$/.test(k));
+  check('zip 内 xlsx 数', zipFiles.length === 11, String(zipFiles.length));
+  const has = s => zipFiles.some(k => k.includes(s));
+  check('含总表', has('查寝得分总表.xlsx'), '');
+  check('含第七周全表', has('第七周/查寝全表_第7周.xlsx'), '');
+  check('含第八周全表', has('第八周/查寝全表_第8周.xlsx'), '');
+  check('班级表路径', has('按班级分类/计科26级1班/计科1班_第7周.xlsx'), '');
+  check('楼栋目录补零 C01', has('C01楼/C01楼_第7周.xlsx'), '');
+  check('楼栋目录补零 C02', has('C02楼/C02楼_第8周.xlsx'), '');
+
+  const severe = res.issues.filter(i => i.level === '严重');
+  check('自检无严重问题', severe.length === 0, severe.map(s => s.msg).join('; '));
+  const duplicate = res.issues.filter(i => i.msg.includes('跳过重复文件') && i.week === '第7周');
+  check('报出重复文件 C1 (1)', duplicate.length === 1, duplicate[0] && duplicate[0].msg);
+
+  const c1 = res.classTables['第7周']['计科26级1班'];
+  check('计科1班寝室数 1', c1.length === 1, String(c1.length));
+  check('计科1班人数 4', c1[0].beds.filter(b => b && b.name).length === 4, '');
+  check('C1-101 寝室得分 83.13', c1[0].roomScore === 83.13, String(c1[0].roomScore));
+  check('示例学生01 得分 80', c1[0].beds[0].score === 80, String(c1[0].beds[0].score));
+  check('全表 2 间', res.fullRows['第7周'].length === 2, String(res.fullRows['第7周'].length));
+  check('C1 楼 1 间', res.buildingTables['第7周']['C1'].length === 1, '');
+  check('C1-101 四床齐全', res.buildingTables['第7周']['C1'][0].beds.every(Boolean), '');
+  check('排名第一是信安1班', res.rank[0].cls === '信安26级1班', res.rank[0].cls);
+  check('班级数 2', res.rank.length === 2, String(res.rank.length));
+
+  const one = zipFiles.find(k => k.includes('计科1班_第7周'));
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.load(await res.zip.file(one).async('arraybuffer'));
+  const ws = wb.getWorksheet('计科26级1班');
+  check('工作表名', !!ws, ws ? ws.name : '无');
+  check('A1 标题合并', ws && ws.getCell('A1').isMerged, '');
+  const hArgb = ws && ws.getCell('A3').fill.fgColor.argb;
+  check('表头底色深蓝', String(hArgb).toUpperCase().includes('1F4E79'), String(hArgb));
+  check('列宽已设', ws && ws.getColumn(3).width === 17, '');
+  check('A4 打印', ws && ws.pageSetup.paperSize === 9, '');
+  check('一页宽', ws && ws.pageSetup.fitToWidth === 1, '');
+
+  const single = await window.BUILD.buildAll([{ week: '第8周', files: f8 }]);
+  check('单周出 6 个表', single.count === 6, String(single.count));
+  const singleWb = new ExcelJS.Workbook();
+  await singleWb.xlsx.load(await single.zip.file('查寝得分汇总/查寝得分总表.xlsx').async('arraybuffer'));
+  const classHeaders = singleWb.getWorksheet('班级汇总').getRow(3).values;
+  const roomHeaders = singleWb.getWorksheet('寝室明细').getRow(3).values;
+  check('单周无各周平均列', !classHeaders.includes('各周平均') && classHeaders.length === 7, JSON.stringify(classHeaders));
+  check('单周无变化列', !roomHeaders.includes('变化') && roomHeaders.length === 5, JSON.stringify(roomHeaders));
+
+  const pass = checks.filter(c => c[1]).length;
+  document.getElementById('result').textContent = checks.map(([label, ok, detail]) =>
+    `${ok ? '[OK]' : '[FAIL]'} ${label}${detail ? ' — ' + detail : ''}`).join('\n') +
+    `\n\nPASS ${pass}/${checks.length}，用时 ${ms} ms`;
+  document.title = `PASS ${pass}/${checks.length}`;
+}
+
+run().catch(error => {
+  document.getElementById('result').textContent = 'ERROR: ' + error.message;
+  document.title = 'ERROR';
+  log(error.stack || '');
+});
+</script>
+</body>
+</html>

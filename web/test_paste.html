@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>查寝得分汇总工具</title>
+<style>
+  :root {
+    --color-ink: #17263a; --color-sub: #5c6b7e; --color-line: #dce4ed;
+    --color-brand: #174d73; --color-brand-dark: #103b5b; --color-brand-soft: #edf5fa;
+    --color-accent: #138a83; --color-ok: #16734a; --color-ok-soft: #edf8f2;
+    --color-warn: #9a5a08; --color-warn-soft: #fff7e8;
+    --color-bad: #b4232f; --color-bad-soft: #fff0f1;
+    --color-bg: #f3f6f9; --color-card: #fff; --color-soft: #f8fafc;
+    --font-body: "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
+    --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px;
+    --space-5: 20px; --space-6: 24px; --radius: 14px;
+  }
+  * { box-sizing: border-box; }
+  html { overflow-x: clip; }
+  body {
+    margin: 0; padding: 30px 20px 56px; overflow-x: clip;
+    font-family: var(--font-body); background: var(--color-bg);
+    color: var(--color-ink); line-height: 1.6;
+  }
+  button, input, select { font: inherit; }
+  button, select, input { min-height: 42px; }
+  button { border: 0; border-radius: 9px; padding: 9px 18px; cursor: pointer; font-size: 14px; }
+  button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible, #drop:focus-visible {
+    outline: 3px solid #68a8cd; outline-offset: 3px;
+  }
+  button:disabled { cursor: not-allowed; opacity: .58; }
+  .primary { background: var(--color-brand); color: var(--color-card); font-weight: 600; }
+  .primary:hover:not(:disabled) { background: var(--color-brand-dark); }
+  .ghost { background: #eaf0f5; color: #29465f; }
+  .ghost:hover:not(:disabled) { background: #dfe8ef; }
+  .danger-ghost { background: var(--color-bad-soft); color: var(--color-bad); }
+  .wrap { max-width: 960px; margin: 0 auto; }
+  .hero { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4); }
+  .brand { display: flex; gap: 13px; align-items: center; }
+  .brand-mark {
+    width: 46px; height: 46px; flex: 0 0 46px; display: grid; place-items: center;
+    border-radius: 13px; background: var(--color-brand); color: var(--color-card);
+  }
+  .brand-mark svg { width: 29px; height: 29px; }
+  h1 { font-size: 25px; line-height: 1.3; margin: 0 0 5px; letter-spacing: .01em; }
+  .hero p { margin: 0; color: var(--color-sub); font-size: 13px; }
+  .offline {
+    flex: 0 0 auto; padding: 4px 10px; border: 1px solid #bfe2d2; border-radius: 99px;
+    background: var(--color-ok-soft); color: var(--color-ok); font-size: 12px; font-weight: 600;
+  }
+  .steps {
+    display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px;
+    padding: 0; margin: 24px 0 16px; list-style: none;
+  }
+  .steps li {
+    position: relative; padding: 10px 8px; border-top: 3px solid var(--color-line);
+    color: var(--color-sub); font-size: 12px; text-align: center;
+  }
+  .steps li.active { border-color: var(--color-brand); color: var(--color-brand); font-weight: 600; }
+  .steps li.done { border-color: var(--color-accent); color: var(--color-ok); }
+  .card {
+    background: var(--color-card); border: 1px solid var(--color-line);
+    border-radius: var(--radius); padding: 22px; margin-top: 14px;
+    box-shadow: 0 4px 16px rgba(23, 38, 58, .035);
+  }
+  .section-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 14px; }
+  .section-title { font-size: 16px; font-weight: 700; margin: 0; }
+  .section-note { color: var(--color-sub); font-size: 12px; }
+  #drop {
+    border: 2px dashed #bdccda; border-radius: 12px; padding: 28px 20px;
+    text-align: center; cursor: pointer; background: var(--color-soft);
+  }
+  #drop:hover, #drop.hot { border-color: var(--color-brand); background: var(--color-brand-soft); }
+  #drop .big { font-size: 16px; font-weight: 700; margin-bottom: 5px; }
+  #drop .small { font-size: 12px; color: var(--color-sub); }
+  #drop input { display: none; }
+  kbd {
+    display: inline-block; padding: 0 5px; border: 1px solid #c4d0dc; border-bottom-width: 2px;
+    border-radius: 4px; background: var(--color-card); font: 11px var(--font-body); color: #40546a;
+  }
+  code { background: #eaf0f5; padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+  .bar { display: flex; gap: 10px; align-items: center; margin-top: 16px; flex-wrap: wrap; }
+  .bar.compact { margin-top: 10px; }
+  .hint { color: var(--color-sub); font-size: 12px; }
+  .weeks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 16px; }
+  .wk { min-width: 0; border: 1px solid var(--color-line); border-radius: 11px; padding: 14px; background: var(--color-soft); }
+  .wk-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .wk-title { font-size: 13px; font-weight: 700; }
+  .wk-remove { min-height: 32px; padding: 2px 7px; background: transparent; color: var(--color-sub); font-size: 12px; }
+  .week-label { display: flex; align-items: center; gap: 9px; margin-top: 9px; font-size: 12px; color: var(--color-sub); }
+  .week-label input {
+    width: 120px; padding: 6px 9px; border: 1px solid #bdcbd8; border-radius: 7px;
+    background: var(--color-card); color: var(--color-ink);
+  }
+  .wk-files { margin: 9px 0 0; padding: 0; list-style: none; font-size: 12px; color: var(--color-sub); }
+  .wk-files li { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 3px 0; }
+  .file-name { min-width: 0; overflow-wrap: anywhere; }
+  .file-remove { flex: 0 0 auto; min-height: 28px; padding: 0 5px; background: transparent; color: var(--color-sub); font-size: 12px; }
+  .files { margin-top: 10px; font-size: 12px; color: var(--color-sub); }
+  .notice { padding: 7px 10px; margin-top: 6px; border-radius: 7px; background: var(--color-warn-soft); color: var(--color-warn); overflow-wrap: anywhere; }
+  #status { font-size: 13px; color: var(--color-sub); }
+  .progress { height: 5px; margin-top: 12px; border-radius: 99px; background: #e5ebf0; overflow: hidden; }
+  .progress > div { height: 100%; width: 0; background: var(--color-accent); }
+  .rules { margin-top: 16px; border-top: 1px solid var(--color-line); padding-top: 12px; font-size: 12px; color: var(--color-sub); }
+  .rules summary { cursor: pointer; color: var(--color-brand); font-weight: 600; }
+  .rules p { margin: 8px 0 0; }
+  .summary-box { padding: 12px 14px; border-radius: 9px; background: var(--color-ok-soft); color: var(--color-ok); font-size: 13px; }
+  .summary-box.bad { background: var(--color-bad-soft); color: var(--color-bad); }
+  .filters { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 12px; }
+  .filters select { padding: 6px 30px 6px 9px; border: 1px solid var(--color-line); border-radius: 7px; background: var(--color-card); color: var(--color-ink); font-size: 12px; }
+  .issues { margin: 10px 0 0; padding: 0; list-style: none; font-size: 13px; max-height: 300px; overflow: auto; }
+  .issues li { display: flex; align-items: flex-start; gap: 8px; padding: 9px 2px; border-bottom: 1px solid #edf1f5; }
+  .issue-text { min-width: 0; overflow-wrap: anywhere; }
+  .badge { flex: 0 0 auto; padding: 0 6px; border-radius: 5px; font-size: 11px; font-weight: 700; }
+  .badge.bad { color: var(--color-bad); background: var(--color-bad-soft); }
+  .badge.warn { color: var(--color-warn); background: var(--color-warn-soft); }
+  .table-scroll { overflow-x: auto; margin-top: 10px; border: 1px solid var(--color-line); border-radius: 9px; }
+  table.preview { width: 100%; min-width: 520px; border-collapse: collapse; font-size: 13px; }
+  table.preview th { background: var(--color-brand); color: var(--color-card); padding: 9px 8px; font-size: 12px; white-space: nowrap; }
+  table.preview td { padding: 8px; border-bottom: 1px solid #edf1f5; text-align: center; }
+  table.preview td.l { text-align: left; }
+  table.preview tr:nth-child(even) td { background: var(--color-soft); }
+  table.preview tr.top td { background: var(--color-warn-soft); }
+  .download-hero { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+  .download-count { font-size: 22px; font-weight: 700; color: var(--color-brand); }
+  .manifest { margin-top: 14px; border: 1px solid var(--color-line); border-radius: 9px; overflow: hidden; }
+  .manifest details { border-bottom: 1px solid var(--color-line); }
+  .manifest details:last-child { border-bottom: 0; }
+  .manifest summary { cursor: pointer; padding: 10px 13px; background: var(--color-soft); font-size: 13px; font-weight: 600; }
+  .manifest ul { margin: 0; padding: 8px 18px 10px 32px; color: var(--color-sub); font-size: 12px; }
+  .manifest li { padding: 2px 0; overflow-wrap: anywhere; }
+  .ack { display: flex; align-items: flex-start; gap: 8px; margin-top: 12px; padding: 11px; border-radius: 8px; background: var(--color-bad-soft); color: var(--color-bad); font-size: 12px; }
+  .ack input { min-height: 18px; width: 18px; margin-top: 2px; flex: 0 0 auto; }
+  .hide { display: none !important; }
+  .foot { margin-top: 22px; color: #758396; text-align: center; font-size: 12px; }
+  @media (max-width: 640px) {
+    body { padding: 20px 12px 36px; }
+    .hero { display: block; }
+    .offline { display: inline-block; margin: 12px 0 0 59px; }
+    h1 { font-size: 21px; }
+    .steps li { font-size: 11px; padding: 8px 2px; }
+    .card { padding: 16px; border-radius: 12px; }
+    #drop { padding: 23px 12px; }
+    .weeks { grid-template-columns: minmax(0, 1fr); }
+    .section-head, .download-hero { align-items: flex-start; flex-direction: column; }
+    .bar .primary { flex: 1 1 170px; }
+    .download-hero .primary { width: 100%; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { scroll-behavior: auto !important; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="hero">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 32 32" fill="none"><path d="M5 27V9l11-5 11 5v18M10 12h3v3h-3zm9 0h3v3h-3zm-9 7h3v3h-3zm9 0h3v3h-3zM3 27h26" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="m20 25 3 3 6-7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
+      </div>
+      <div><h1>查寝得分汇总工具</h1><p>从学校评分表到上报汇总表，一次完成解析、核对与打包。</p></div>
+    </div>
+    <span class="offline">离线处理 · 不上传数据</span>
+  </header>
+
+  <ol class="steps" aria-label="处理进度">
+    <li id="step1" class="active">1　导入评分表</li><li id="step2">2　核对周次</li>
+    <li id="step3">3　检查异常</li><li id="step4">4　预览下载</li>
+  </ol>
+
+  <main>
+    <section class="card" aria-labelledby="importTitle">
+      <div class="section-head"><h2 class="section-title" id="importTitle">导入学校原始评分表</h2><span class="section-note">支持 ZIP、多个 XLS/XLSX 或整个文件夹</span></div>
+      <div id="drop" role="button" tabindex="0" aria-label="选择或拖入评分表">
+        <div class="big">拖入文件到这里，或点击选择</div>
+        <div class="small">支持 <code>.zip</code> 和学校原始 <code>.xls/.xlsx</code> 评分表，可一次导入多周</div>
+        <div class="small">也可复制文件后按 <kbd>Ctrl</kbd>+<kbd>V</kbd> 粘贴</div>
+        <input id="file" type="file" multiple accept=".zip,.xls,.xlsx">
+        <input id="dir" type="file" webkitdirectory multiple>
+      </div>
+      <div class="bar compact"><button class="ghost" id="pickDir" type="button">选择整个文件夹</button><span class="hint">只读取文件，不会修改学校原始表</span></div>
+      <div class="weeks" id="weeks"></div>
+      <div class="files" id="files" aria-live="polite"></div>
+      <div class="bar">
+        <button class="primary" id="run" type="button" disabled>生成汇总表</button>
+        <button class="ghost" id="reset" type="button">清空</button>
+        <span id="status" role="status" aria-live="polite"></span>
+      </div>
+      <div class="progress hide" id="progress" aria-hidden="true"><div id="progressFill"></div></div>
+      <details class="rules">
+        <summary>使用说明与当前汇总口径</summary>
+        <p>① 导入 ZIP 或 XLS；② 核对每周文件和周次；③ 生成后检查异常；④ 核对文件清单并下载。周次修改在输入框失去焦点后生效。</p>
+        <p>当前口径：多次检查取平均并四舍五入到 2 位；混合寝室的寝室得分照算；按楼栋不分专业；缺失数据不补 0。</p>
+      </details>
+    </section>
+
+    <section class="card hide" id="checkCard" aria-labelledby="checkTitle">
+      <div class="section-head"><h2 class="section-title" id="checkTitle">自检与异常核对</h2><span class="section-note" id="issueCount"></span></div>
+      <div class="summary-box" id="checkSum"></div>
+      <div class="filters" id="issueFilters">
+        <select id="issueLevel" aria-label="按异常级别筛选"><option value="">全部级别</option><option value="严重">仅严重</option><option value="提示">仅提示</option></select>
+        <select id="issueWeek" aria-label="按周次筛选"><option value="">全部周次</option></select>
+      </div>
+      <ul class="issues" id="issues"></ul>
+    </section>
+
+    <section class="card hide" id="previewCard" aria-labelledby="previewTitle">
+      <div class="section-head"><h2 class="section-title" id="previewTitle">班级汇总预览</h2><span class="section-note">前三名已标出，完整明细在 Excel 中</span></div>
+      <div class="table-scroll" id="preview"></div>
+    </section>
+
+    <section class="card hide" id="downCard" aria-labelledby="downTitle">
+      <div class="section-head"><h2 class="section-title" id="downTitle">下载与文件清单</h2><span class="section-note" id="downInfo"></span></div>
+      <div class="download-hero">
+        <div><div class="download-count" id="downloadCount"></div><div class="hint" id="downloadMeta"></div></div>
+        <button class="primary" id="download" type="button">下载全部表格（ZIP）</button>
+      </div>
+      <label class="ack hide" id="ackWrap"><input id="ackSevere" type="checkbox"><span>我已逐项核对严重问题，仍要导出当前结果。请勿在未核实前直接上报。</span></label>
+      <div class="manifest" id="manifest"></div>
+    </section>
+  </main>
+  <div class="foot">数据来源：学校《学生宿舍内务检查评分表》　·　只做搬运与汇总，不改动原始数据</div>
+</div>
+<script src="vendor.bundle.js"></script>
+<script src="xlsx.full.min.js"></script>
+<script src="roster.js"></script>
+<script src="core.js"></script>
+<script src="writer.js"></script>
+<script src="build.js"></script>
+<script src="app.js"></script>
+<script>
+window.addEventListener('load', async () => {
+  const rows = [];
+  const chk = (l, ok, d) => rows.push([l, ok, String(d || '')]);
+
+  async function makeFile(url, name) {
+    const blob = await (await fetch(url)).blob();
+    return new File([blob], name, { type: 'application/zip' });
+  }
+
+  // 路径一：模拟 Ctrl+V 粘贴（ClipboardEvent + DataTransfer）
+  async function pasteFile(file) {
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    const ev = new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true });
+    document.dispatchEvent(ev);
+  }
+
+  // 路径二：模拟点击选择
+  async function pickFile(file) {
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    const input = document.getElementById('file');
+    input.files = dt.files;
+    input.dispatchEvent(new Event('change'));
+  }
+
+  const waitWeeks = async n => {
+    for (let i = 0; i < 80 && document.querySelectorAll('#weeks .wk').length < n; i++) {
+      await new Promise(r => setTimeout(r, 100));
+    }
+    return document.querySelectorAll('#weeks .wk').length;
+  };
+
+  try {
+    chk('界面有粘贴提示', document.body.textContent.includes('Ctrl') && document.body.textContent.includes('粘贴'));
+
+    // ① 粘贴第 7 周 zip
+    await pasteFile(await makeFile('./testdata/第7周宿舍卫生得分.zip', '第7周宿舍卫生得分.zip'));
+    const w1 = await waitWeeks(1);
+    chk('粘贴能读入', w1 === 1, w1);
+    chk('粘贴后状态正常', document.getElementById('status').textContent.includes('已读入'),
+        document.getElementById('status').textContent);
+    chk('周次自动识别', document.querySelector('#weeks input') &&
+        document.querySelector('#weeks input').value === '第7周',
+        document.querySelector('#weeks input') ? document.querySelector('#weeks input').value : '无');
+
+    // ② 再粘贴第 8 周
+    await pasteFile(await makeFile('./testdata/第8周宿舍卫生得分.zip', '第8周宿舍卫生得分.zip'));
+    const w2 = await waitWeeks(2);
+    chk('两周并存', w2 === 2, w2);
+
+    // ③ 生成
+    document.getElementById('run').click();
+    for (let i = 0; i < 150 && !document.getElementById('downInfo').textContent; i++) {
+      await new Promise(r => setTimeout(r, 100));
+    }
+    const info = document.getElementById('downInfo').textContent;
+    chk('出 11 个表', info.includes('11'), info);
+    chk('自检通过', document.getElementById('checkSum').textContent.includes('未发现严重问题'),
+        document.getElementById('checkSum').textContent.slice(0, 40));
+
+    // ④ 粘贴纯文字时应给出提示而不是静默
+    const dt2 = new DataTransfer();
+    dt2.setData('text/plain', 'not-a-file-path');
+    document.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt2, bubbles: true, cancelable: true }));
+    await new Promise(r => setTimeout(r, 100));
+    chk('粘贴文字时提示正确', document.getElementById('status').textContent.includes('粘贴的是文字'),
+        document.getElementById('status').textContent.slice(0, 30));
+  } catch (e) {
+    chk('异常', false, e.message + ' | ' + e.stack.split('\n')[1]);
+  }
+
+  const pass = rows.filter(r => r[1]).length;
+  document.title = `PASTE ${pass}/${rows.length}`;
+  document.body.innerHTML = '<pre id="uitest">' + rows.map(([l, ok, d]) =>
+    `${ok ? '[OK]' : '[FAIL]'} ${l} :: ${d}`).join('\n') + `\n\nPASTE ${pass}/${rows.length}</pre>`;
+});
+</script></body>
+</html>
